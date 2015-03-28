@@ -40,7 +40,9 @@ void USART2_IRQHandler()
 {
 	static signed portBASE_TYPE xHigherPriorityTaskWoken;
 	serial_ch_msg rx_msg;
-
+	
+	trace_interrupt_in(); //add , record interrupt in time
+	
 	/* If this interrupt is for a transmit... */
 	if (USART_GetITStatus(USART2, USART_IT_TXE) != RESET) {
 		/* "give" the serial_tx_wait_sem semaphore to notfiy processes
@@ -72,6 +74,8 @@ void USART2_IRQHandler()
 
 	if (xHigherPriorityTaskWoken)
 		taskYIELD();
+
+	trace_interrupt_out(); //add , record interrupt out time
 }
 
 void send_byte(char ch)
@@ -153,12 +157,31 @@ void queue_str_task(const char *str, int delay)
 
 void queue_str_task1(void *pvParameters)
 {
-	queue_str_task("Hello 1\n\r", 200);
+	queue_str_task("Hello 1\n\r", 300); //200 -> 300
+     
 }
 
 void queue_str_task2(void *pvParameters)
 {
-	queue_str_task("Hello 2\n\r", 50);
+	queue_str_task("Hello 2\n\r", 300); //50->300
+     
+}
+
+// new task 1
+void new_task1(void *pvParameters)
+{
+
+	
+	queue_str_task("hi\n\r", 50); 
+
+}
+
+// new task 2
+void new_task2(void *pvParameters)
+{
+	
+	queue_str_task("sun\n\r", 50);
+	
 }
 
 void serial_readwrite_task(void *pvParameters)
@@ -221,10 +244,10 @@ int main()
 	serial_rx_queue = xQueueCreate(1, sizeof(serial_ch_msg));
 
 	/* Create a task to flash the LED. */
-	xTaskCreate(led_flash_task,
-	            (signed portCHAR *) "LED Flash",
-	            512 /* stack size */, NULL,
-	            tskIDLE_PRIORITY + 5, NULL);
+//	xTaskCreate(led_flash_task,
+//	            (signed portCHAR *) "LED Flash",
+//	            512 /* stack size */, NULL,
+//	            tskIDLE_PRIORITY + 5, NULL); 
 
 	/* Create tasks to queue a string to be written to the RS232 port. */
 	xTaskCreate(queue_str_task1,
@@ -247,6 +270,18 @@ int main()
 	            (signed portCHAR *) "Serial Read/Write",
 	            512 /* stack size */, NULL,
 	            tskIDLE_PRIORITY + 10, NULL);
+	
+	/*Create a new task1*/
+	xTaskCreate(new_task1,
+	    (signed portCHAR *) "New task 1",
+	    512 /* stack size */, NULL,
+	    tskIDLE_PRIORITY + 1, NULL);
+
+	
+	xTaskCreate(new_task2,
+	            (signed portCHAR *) "New task 2",
+	            512 /* stack size */, NULL,
+	            tskIDLE_PRIORITY + 2, NULL);
 
 	/* Start running the tasks. */
 	vTaskStartScheduler();
@@ -260,12 +295,13 @@ void vApplicationTickHook()
 
 void vApplicationIdleHook(void)
 {
-	send_byte('i');
+/*	send_byte('i');
 	send_byte('d');
 	send_byte('l');
 	send_byte('e');
 	send_byte('\n');
 	send_byte('\r');
+*/
 }
 
 int _snprintf_int(int num, char *buf, int buf_size)

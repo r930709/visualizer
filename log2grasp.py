@@ -8,7 +8,8 @@
 TRACE_QUEUE = True
 TRACE_MUTEX = True
 TRACE_BINARY_SEMAPHORE = False
-TRACE_INTERRUPT = False
+#TRACE_INTERRUPT = False  # true
+TRACE_INTERRUPT = True # add
 
 log = open('log', 'r')
 lines = log.readlines()
@@ -19,6 +20,10 @@ mutexes = {}
 all_queues = {}
 binsems = {}
 queues = {}
+context_switch = [] #add
+
+context_switch_time_cost = open('context_switch_time_cost.txt','w') #add
+
 
 for line in lines :
 	line = line.strip()
@@ -36,11 +41,16 @@ for line in lines :
 		tasks[id] = task
 		
 	elif inst == 'switch' :
-		out_task, in_task, tick, tick_reload, out_minitick, in_minitick = args.split(' ')
+		#out_task, in_task, tick, ticik_reload, out_minitick, in_minitick = args.split(' ')
+		out_task, in_task, tick, tick_reload, out_minitick, in_minitick = args.split(' ',5) #cut 5,produce 6
 		
-		out_time = (int(tick) + (int(tick_reload) - int(out_minitick)) / int(tick_reload)) / 100 * 1000;
-		in_time  = (int(tick) + (int(tick_reload) - int(in_minitick))  / int(tick_reload)) / 100 * 1000;
-		
+		#out_time = (int(tick) + (int(tick_reload) - int(out_minitick)) / int(tick_reload)) / 100 * 1000; //unconditional rounding
+		#in_time  = (int(tick) + (int(tick_reload) - int(in_minitick))  / int(tick_reload)) / 100 * 1000; //unconditional rounding 
+	
+
+		out_time = (float(tick) + (float(tick_reload) - float(out_minitick)) / float(tick_reload)) / 100 * 1000; #add, 
+		in_time  = (float(tick) + (float(tick_reload) - float(in_minitick))  / float(tick_reload)) / 100 * 1000; #add,
+	
 		event = {}
 		event['type'] = 'task out'
 		event['task'] = out_task
@@ -54,21 +64,34 @@ for line in lines :
 		event['time'] = in_time
 		events.append(event);
 
+		#add
+		switch = {}
+		switch['type'] = 'context switch'
+		switch['cost_time'] = (in_time - out_time)
+		switch['task_in'] = in_task
+		switch['task_out'] = out_task	
+		context_switch.append(switch);
+		context_switch_time_cost.write('context switch %s to %s takes %f ms\n' % (switch['task_out'],switch['task_in'],switch['cost_time']))
+
+
 		last_task = in_task
 
 	elif inst == 'mutex' and TRACE_MUTEX :
-		task, id = args.split(' ')
+		#task, id = args.split(' ')
+		task, id = args.split(' ',1) #cut 1 , produce 2
 		mutex = {}
 		mutex['type'] = 'mutex'
 		mutex['name'] = 'Mutex ' + str(len(mutexes) + 1)
-		time, mutex['id'] = args.split(' ')
+		#time, mutex['id'] = args.split(' ')
+		time, mutex['id'] = args.split(' ',1) #cut1 , produce 2
 		mutexes[id] = mutex;
 		all_queues[id] = mutex;
 
 	elif inst == 'queue' :
 		act, args = args.split(' ', 1)
 		if act == 'create' :
-			time, id, queue_type, queue_size = args.split(' ')
+			#time, id, queue_type, queue_size = args.split(' ')
+			time, id, queue_type, queue_size = args.split(' ',3) #cut3 , produce 4
 
 			if queue_type == '0' and TRACE_QUEUE :
 				queue = {}
@@ -86,7 +109,8 @@ for line in lines :
 				all_queues[id] = binsem;
 
 		elif act == 'send' or act == 'recv' :
-			time, task_id, id = args.split(' ')
+			#time, task_id, id = args.split(' ')
+			time, task_id, id = args.split(' ',2) #cut 2 ,produce 3
 			if id in all_queues and int(time) > 0 :
 				queue = all_queues[id]
 
@@ -123,7 +147,9 @@ for line in lines :
 				events.append(event);
 		
 		elif act == 'block' :
-			time, task_id, id = args.split(' ')
+			#time, task_id, id = args.split(' ')
+			time, task_id, id = args.split(' ',2) #cut 2 ,produce 3
+			
 			if id in all_queues and all_queues[id]['type'] == 'binary semaphore':
 				event = {}
 				event['target'] = id
@@ -163,6 +189,7 @@ for line in lines :
 			events.append(event)
 			tasks[int_num]['created'] = True if dir == 'in' else False
 
+context_switch_time_cost.close() #add
 log.close()
 
 grasp = open('sched.grasp', 'w')
